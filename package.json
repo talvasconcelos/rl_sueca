@@ -1,0 +1,17 @@
+{
+  "name": "sueca",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@tensorflow/tfjs": "^1.2.9",
+    "install": "^0.13.0",
+    "npm": "^6.11.3"
+  }
+}
