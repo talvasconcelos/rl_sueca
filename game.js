@@ -56,7 +56,7 @@ class Game {
             this.gameOver = true
             console.log('Winner is', winner)
         }
-        console.log(this.agent.memory)
+        // console.log(this.agent.memory)
     }
 
     resetPlayScore(){
@@ -76,12 +76,12 @@ class Game {
     startGame(){
         for (let i = 0; i < this.defaults.maxRounds; i++) {
             if(this.gameOver){break}
-            console.log('Round:', i + 1)
+            // console.log('Round:', i + 1)
             this.startRound()
             this.getRoundWinner()
             this.resetPlayScore()
             this.firstRound = false
-            console.log('Points:', this.gameScore)                 
+            // console.log('Points:', this.gameScore)                 
         }
         !this.gameOver && this.getWinner()
     }
@@ -104,21 +104,26 @@ class Game {
         return ordered
     }
 
-    playCard(cards){
+    async playCard(cards){
         const isAI = this.players[this.turn].AI
         const data = {}
+        let action
         let state
-        let action = Math.floor(Math.random() * cards.length)
         if(isAI){
             data.trump = this.trump
             data.hand = cards
             data.table = this.tableCards
             data.played = this.playedCards
-            state = this.agent.getState(data)
-            action = this.agent.takeAction(state, cards)
+            state = this.agent.getState(data).then((s) => {
+                action = this.agent.takeAction(s, cards.length)
+            })
+            
+            console.debug(action)
             this.memory.push(state, action)
+        } else {
+            action = Math.floor(Math.random() * cards.length)
         }
-        console.log(cards[action])
+        // console.log(cards[action])
         const pickCard = cards[action]
         const idxCard = this.players[this.turn].hand.indexOf(pickCard)
         this.tableCards.push(pickCard)
@@ -158,8 +163,9 @@ class Game {
         return maxIndex
     }
 
-    trickWinner(order){
+    async trickWinner(order){
         const cards = this.tableCards
+        console.debug('table cards', cards)
         const followSuit = cards[0].suit
         const points = cards.reduce((sum, c) => (sum += c.points), 0)
         cards.map((c, i) => c.suit !== followSuit && c.suit !== this.trump ? cards[i].ignore = true : c)
@@ -173,25 +179,34 @@ class Game {
         data.hand = this.players[0].hand
         data.table = this.tableCards
         data.played = this.playedCards
-        const nextState = this.agent.getState(data)
+        const nextState = Promise.resolve(this.agent.getState(data))
         const done = this.playedCards.length === 40
+        console.debug(done)
         this.memory.push(points, nextState, done)
         if(this.agent.memory.length > this.agent.maxMem - 1){
             this.agent.memory.shift()
         }
         this.agent.memory.push(this.memory)
+        if(done && this.agent.memory.length > this.agent.batchSize) {
+            // console.log(agent.memory.length, batch_size)
+            console.log('train')
+            await this.agent.expReplay()//.then(console.debug('stopped training!')
+            this.tableCards = []
+            this.memory = []
+            return
+        }
         this.tableCards = []
         this.memory = []
     }
 
     playHands(){
         const order = this.playOrder()
-        // console.log(this.starter)
-        order.map(p => {
-            this.turn = this.players.indexOf(p)
-            const hand = this.validateCards(p.hand)            
-                this.playCard(hand)            
-        })
+        for (let i = 0; i < order.length; i++) {
+            this.turn = this.players.indexOf(order[i])
+            // console.log(order[i].hand)
+            const hand = this.validateCards(order[i].hand)
+            this.playCard(hand)
+        }
         this.trickWinner(order)
     }
 
@@ -204,7 +219,7 @@ class Game {
         const hands = deckU.dealHand(deck, side)
         this.dealHands(hands, this.starter)
         for (let i = 0; i < this.defaults.maxPlays; i++) {
-            console.log('Vaza', i + 1)
+            // console.log('Vaza', i + 1)
             this.playHands()
         }
     }

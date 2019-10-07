@@ -1,8 +1,13 @@
 const Game = require('./game')
-const d = require('./deck')
 const Agent = require('./agentDQN')
 const agent = new Agent(15)
 
-const game = new Game(agent)
+for (let index = 0; index < 3; index++) {
+    const game = new Game(agent)
+    game.startGame()
+    console.log('Game:', index + 1)
+}
 
-game.startGame()
+// const game = new Game(agent)
+
+// game.startGame()
