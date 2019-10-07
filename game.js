@@ -8,7 +8,7 @@ class Game {
             maxPlays: 10
         }
         this.players = [
-            {player: 'P1', team: 'teamA', hand: [], AI: true},
+            {player: 'P1', team: 'teamA', hand: [], AI: false},
             {player: 'P2', team: 'teamB', hand: [], AI: false},
             {player: 'P3', team: 'teamA', hand: [], AI: false},
             {player: 'P4', team: 'teamB', hand: [], AI: false}
@@ -104,26 +104,11 @@ class Game {
         return ordered
     }
 
-    async playCard(cards){
+    playCard(cards){
+        console.log('playcard', this.players[this.turn].player)
         const isAI = this.players[this.turn].AI
-        const data = {}
-        let action
-        let state
-        if(isAI){
-            data.trump = this.trump
-            data.hand = cards
-            data.table = this.tableCards
-            data.played = this.playedCards
-            state = this.agent.getState(data).then((s) => {
-                action = this.agent.takeAction(s, cards.length)
-            })
-            
-            console.debug(action)
-            this.memory.push(state, action)
-        } else {
-            action = Math.floor(Math.random() * cards.length)
-        }
-        // console.log(cards[action])
+        const action = Math.floor(Math.random() * cards.length)
+        // console.log(cards[action], isAI)
         const pickCard = cards[action]
         const idxCard = this.players[this.turn].hand.indexOf(pickCard)
         this.tableCards.push(pickCard)
@@ -163,9 +148,9 @@ class Game {
         return maxIndex
     }
 
-    async trickWinner(order){
+    trickWinner(order){
         const cards = this.tableCards
-        console.debug('table cards', cards)
+        // console.debug('table cards', cards)
         const followSuit = cards[0].suit
         const points = cards.reduce((sum, c) => (sum += c.points), 0)
         cards.map((c, i) => c.suit !== followSuit && c.suit !== this.trump ? cards[i].ignore = true : c)
@@ -179,22 +164,22 @@ class Game {
         data.hand = this.players[0].hand
         data.table = this.tableCards
         data.played = this.playedCards
-        const nextState = Promise.resolve(this.agent.getState(data))
+        // const nextState = Promise.resolve(this.agent.getState(data))
         const done = this.playedCards.length === 40
         console.debug(done)
-        this.memory.push(points, nextState, done)
-        if(this.agent.memory.length > this.agent.maxMem - 1){
-            this.agent.memory.shift()
-        }
-        this.agent.memory.push(this.memory)
-        if(done && this.agent.memory.length > this.agent.batchSize) {
-            // console.log(agent.memory.length, batch_size)
-            console.log('train')
-            await this.agent.expReplay()//.then(console.debug('stopped training!')
-            this.tableCards = []
-            this.memory = []
-            return
-        }
+        // this.memory.push(points, nextState, done)
+        // if(this.agent.memory.length > this.agent.maxMem - 1){
+        //     this.agent.memory.shift()
+        // }
+        // this.agent.memory.push(this.memory)
+        // if(done && this.agent.memory.length > this.agent.batchSize) {
+        //     // console.log(agent.memory.length, batch_size)
+        //     console.log('train')
+        //    this.agent.expReplay()//.then(console.debug('stopped training!')
+        //     this.tableCards = []
+        //     this.memory = []
+        //     return
+        // }
         this.tableCards = []
         this.memory = []
     }

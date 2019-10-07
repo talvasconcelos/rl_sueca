@@ -1,13 +1,18 @@
-const Game = require('./game')
-const Agent = require('./agentDQN')
-const agent = new Agent(15)
+const Game = require('./sueca')
+// const Agent = require('./agentDQN')
+// const agent = new Agent(15)
 
-for (let index = 0; index < 3; index++) {
-    const game = new Game(agent)
-    game.startGame()
-    console.log('Game:', index + 1)
+const train = async _ => {
+    for (let index = 0; index < 5; index++) {
+        console.log('Game:', index + 1)
+        const game = new Game()
+        await game.startGame()
+    }
 }
 
-// const game = new Game(agent)
+train()
 
+
+
+// const game = new Game()
 // game.startGame()
