@@ -1,10 +1,10 @@
 const d = require('./deck')
-const Agent = require('./agentDQN')
+// const Agent = require('./agentDQN')
 
-const agent = new Agent(1800)
+// const agent = new Agent(40)
 
 class Game{
-    constructor(){
+    constructor(agent){
         this.defaults = {
             maxRounds: 8,
             maxPlayers: 4,
@@ -19,6 +19,7 @@ class Game{
         this.memory = []
         this.deck = d.makeDeck().deck
         this.turn = null
+        this.agent = agent
         this.trump = null
         this.firstRound = true
         this.tableCards = []
@@ -128,6 +129,7 @@ class Game{
             await this.getRoundWinner()
             await this.resetPlayScore()
             this.firstRound = false
+            // console.log(this.deck)
             // console.log('Points:', this.gameScore)                 
         }
         !this.gameOver && this.getWinner()
@@ -163,13 +165,14 @@ class Game{
         }, Promise.resolve())
         const winner = await this.trickWinner(order)
         // console.debug('End Hand!', winner.player)
-        return
+        return winner
     }
 
     async playCard(cards){
         // console.debug(this.players[this.turn].player)
         const isAI = this.players[this.turn].AI
         const action = isAI ? await this.getAction(cards) : Math.floor(Math.random() * cards.length)
+        // isAI && console.debug('playCard', action)
         const pickCard = cards[action]
         const idxCard = this.players[this.turn].hand.indexOf(pickCard)
         this.tableCards.push(pickCard)
@@ -185,8 +188,8 @@ class Game{
         data.hand = cards
         data.table = this.tableCards
         data.played = this.playedCards
-        const state = await agent.getState(data)
-        const action = await agent.takeAction(state, cards.length)
+        const state = await this.agent.getState(data)
+        const action = await this.agent.takeAction(state, cards.length)
         this.memory.push(state, action)
         return action
     }
@@ -196,30 +199,33 @@ class Game{
         // console.debug('table cards', cards)
         const followSuit = cards[0].suit
         const points = cards.reduce((sum, c) => (sum += c.points), 0)
-        const reward = (points - 0) / (44 - 0)
         cards.map((c, i) => c.suit !== followSuit && c.suit !== this.trump ? cards[i].ignore = true : c)
         const idxCard = this.indexOfMax(cards)
         const winner = order[idxCard]
         this.starter = this.players.indexOf(winner)
         this.playScore[winner.team] += points
         this.wonHands[winner.team]++
+        const reward = this.players[this.starter].team === winner.team 
+            ? this.playScore[winner.team] / 120
+            : 0
         const data = {}
         data.trump = this.trump
         data.hand = this.players[0].hand
         data.table = this.tableCards
         data.played = this.playedCards
-        const nextState = await agent.getState(data)
+        const nextState = await this.agent.getState(data)
         const done = this.playedCards.length === 40
         // console.debug(done)
         this.memory.push(reward, nextState, done)
-        if(agent.memory.length > agent.maxMem - 1){
-            agent.memory.shift()
+        if(this.agent.memory.length > this.agent.maxMem - 1){
+            this.agent.memory.shift()
         }
-        agent.memory.push(this.memory)
-        if(done && agent.memory.length > agent.batchSize) {
-            // console.log(agent.memory.length, batch_size)
+        
+        this.agent.memory.push(this.memory)
+        if(done && this.agent.memory.length > this.agent.batchSize) {
+            // console.log(this.agent.memory.length, batch_size)
             console.log('train')
-            await agent.expReplay()//.then(console.debug('stopped training!')
+            await this.agent.expReplay()//.then(console.debug('stopped training!')
         }
         this.tableCards = []
         this.memory = []

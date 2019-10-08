@@ -3,8 +3,8 @@ const tf = require('@tensorflow/tfjs')
 
 // require('@tensorflow/tfjs-node')
 
-class Agent{
-    constructor(stateSize, modelName = 'DQN', gamma = 0.95, epsilon = 1.0, epsMin = 0.01, epsDecay = 0.95, lr = 0.001){
+class Agent {
+    constructor(stateSize, modelName = 'DQN', gamma = 0.95, epsilon = 1.0, epsMin = 0.01, epsDecay = 0.95, lr = 0.001) {
         this.stateSize = stateSize
         this.actionSize = 10
         this.batchSize = 32
@@ -28,14 +28,22 @@ class Agent{
         this.model = this.model()
     }
 
-    model(){
+    model() {
         const model = tf.sequential()
-        model.add(tf.layers.dense({units: 256, inputDim: this.stateSize, activation: 'relu'}))
-        // model.add(tf.layers.dense({units: 32, activation: 'relu'}))
-        model.add(tf.layers.dense({units: this.actionSize, activation: 'softmax'}))
+        model.add(tf.layers.dense({
+            units: 128,
+            inputDim: this.stateSize,
+            activation: 'elu'
+        }))
+        model.add(tf.layers.dense({units: 32, activation: 'elu'}))
+        model.add(tf.layers.dense({
+            units: this.actionSize,
+            activation: 'softmax'
+        }))
 
         model.compile({
-            optimizer: tf.train.adam({learningRate: this.lr}),
+            // optimizer: tf.train.adam({learningRate: this.lr}),
+            optimizer: tf.train.adam(),
             loss: 'meanSquaredError',
             metrics: ['accuracy']
         })
@@ -44,17 +52,17 @@ class Agent{
         return model
     }
 
-    encode(arr){
+    encode(arr) {
         const idx = arr.map((_, i) => i)
         const enc = tf.oneHot(idx, arr.length)
         // enc.print()
         return enc.arraySync()
     }
 
-    addTrumpConcat(trump, tensor){
+    addTrumpConcat(trump, tensor) {
         return new Promise(resolve => {
             // console.log(name, tensor)
-            if(tensor.length === 0){
+            if (tensor.length === 0) {
                 return resolve(tf.zeros([40, 15]).arraySync())
             }
             const x = tensor.map(c => {
@@ -66,39 +74,88 @@ class Agent{
                 ]).arraySync()
             })
             const trumpedTensor = tf.tensor(x)
-            const out = trumpedTensor.pad([[0, 40 - trumpedTensor.shape[0]], [0,0]]).arraySync()
+            const out = trumpedTensor.pad([
+                [0, 40 - trumpedTensor.shape[0]],
+                [0, 0]
+            ]).arraySync()
             // console.debug('concat')
-            console.log(out)
+            // console.log(out)
             return resolve(out)
         })
     }
 
-    async getState(state){
-        const {trump, hand, table, played} = state
+    async _getState(state) {
+        const {
+            trump,
+            hand,
+            table,
+            played
+        } = state
         const stateHand = await this.addTrumpConcat(trump, hand)
         const stateTable = await this.addTrumpConcat(trump, table)
-        const statePlayed = await this.addTrumpConcat(trump, played)        
+        const statePlayed = await this.addTrumpConcat(trump, played)
         // await Promise.all([stateHand, stateTable, statePlayed])
         // console.debug('getState')
         return [stateHand, stateTable, statePlayed]
-   
-            // return [stateHand, stateTable, statePlayed]
 
- 
+        // return [stateHand, stateTable, statePlayed]
+
+
+    }
+
+    async getState(data){
+        const {
+            trump,
+            hand,
+            table,
+            played
+        } = data
+        const state = tf.buffer([4, 10])
+        const trumpIdx = this.deck.suits.indexOf(trump)
+        // console.debug(isTrump)
+        await hand.map(c => {
+            const t = c.idx[0] === trumpIdx ? 2 : 1
+            state.set(t, c.idx[0], c.idx[1])
+        })
+        await played.map(c => {
+            const t = c.idx[0] === trumpIdx ? 6 : 5
+            state.set(t, c.idx[0], c.idx[1])
+        })
+        await table.map(c => {
+            const t = c.idx[0] === trumpIdx ? 4 : 3
+            state.set(t, c.idx[0], c.idx[1])
+        })
+        // state.toTensor().print()
+        return state.toTensor()
     }
 
     async takeAction(state, hand){
+        const random = Math.floor(Math.random() * hand)
+        if (Math.random() <= this.epsilon) {
+            return random
+        }
+        const input = state.reshape([1, this.stateSize])
+        const prediction = await this.model.predict(input)
+        const pred = prediction.argMax(1).dataSync()[0]
+        // prediction.print()
+        // console.log('act', prediction.argMax(1).dataSync()[0])
+        // console.debug('takeAction', pred, hand, random)
+        const action = pred >= hand ? random : pred
+        return action
+    }
+
+    async _takeAction(state, hand) {
         // console.debug('takeAction')            
         const random = Math.floor(Math.random() * hand)
-        if(Math.random() <= this.epsilon){
+        if (Math.random() <= this.epsilon) {
             // console.log('Random AI')
             return random
         }
         // console.log('Take action AI')
-        const stateInput = await tf.concat(state).flatten().reshape([1, this.stateSize])
+        const stateInput = await tf.concat(state).reshape([1, this.stateSize])
         const p = await this.model.predict(stateInput)
-        stateInput.print()
-        p.print()
+        // stateInput.print()
+        // p.print()
         // console.log(p.argMax().dataSync()[0])
         // console.log(stateInput.shape)
         // console.log(p.argMax().dataSync()[0])
@@ -111,40 +168,42 @@ class Agent{
         return action
     }
 
-    async expReplay(){
+    async fastExpRep(){
+
+    }
+
+    async expReplay() {
         console.debug('Training...')
-        const minibatch = await this.memory.concat().sort(() => .5 - Math.random()).slice(0, this.batchSize)
+        const minibatch = [...this.memory].sort(() => .5 - Math.random()).slice(0, this.batchSize)
         // console.debug(minibatch)
         for (let i = 0; i < minibatch.length - 1; i++) {
             let [state, action, reward, next_state, done] = minibatch[i]
             // console.debug(state, next_state)
             // console.log(minibatch[i])
-            state = await tf.concat(state).flatten().reshape([1, this.stateSize])
-            next_state = await tf.concat(next_state).flatten().reshape([1, this.stateSize])
+            state = await state.reshape([1, this.stateSize])
+            next_state = await next_state.reshape([1, this.stateSize])
             let target = reward
             // console.log(next_state.shape, state.shape)
-
             if (!done) {
                 let predictNext = await this.model.predict(next_state)
-                // let y = predictNext.argMax().dataSync()[0]
-                target = reward + this.gamma * predictNext.argMax().dataSync()[0]
-                // console.log(target)
+                // let y = predictNext.argMax().dataSync()
+                target = reward + this.gamma * predictNext.argMax(1).dataSync()[0]
+                // console.log('y', y)
             }
 
             let target_f = await this.model.predict(state).dataSync()
-            // console.log(target_f)
             target_f[action] = target
-            target_f = await tf.tensor2d(target_f, [1, this.actionSize])
+            // target_f = await tf.tensor1d(target_f)
             // target_f.print()
             // console.log(target_f.shape)
             // target_f.print()
-            // target_f = tf.tensor2d(target_f, [1, this.actionSize])//.reshape([1,3])
+            target_f = tf.tensor2d(target_f, [1, this.actionSize])//.reshape([1,3])
             await this.model.fit(state, target_f, {
                 epochs: 1,
                 verbose: 1,
                 callbacks: {
                     onEpochEnd: (epoch, logs) => {
-                        // console.log(logs)
+                        // console.log('Logloss:', logs.loss)
                         process.stdout.write(`${logs.loss} ${logs.acc}                             \r`)
                     }
                 }
