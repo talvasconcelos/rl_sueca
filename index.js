@@ -3,9 +3,9 @@ const Agent = require('./agentDQN')
 const agent = new Agent(40)
 
 const train = async _ => {
-    for (let index = 0; index < 10000; index++) {
+    for (let index = 0; index < 1000; index++) {
         console.log('Game:', index + 1)
-        const game = new Game(agent)
+        const game = new Game(agent, index > 10)
         await game.startGame()
     }
 }

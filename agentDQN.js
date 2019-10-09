@@ -1,7 +1,7 @@
 const d = require('./deck')
 const tf = require('@tensorflow/tfjs')
 
-// require('@tensorflow/tfjs-node')
+require('@tensorflow/tfjs-node')
 
 class Agent {
     constructor(stateSize, modelName = 'DQN', gamma = 0.95, epsilon = 1.0, epsMin = 0.01, epsDecay = 0.95, lr = 0.001) {
@@ -9,7 +9,7 @@ class Agent {
         this.actionSize = 10
         this.batchSize = 32
         this.memory = []
-        this.maxMem = 100000
+        this.maxMem = 10000
         this.state = null
         this.nextState = null
         this.reward = null
@@ -31,11 +31,11 @@ class Agent {
     model() {
         const model = tf.sequential()
         model.add(tf.layers.dense({
-            units: 128,
+            units: 40,
             inputDim: this.stateSize,
             activation: 'elu'
         }))
-        model.add(tf.layers.dense({units: 32, activation: 'elu'}))
+        // model.add(tf.layers.dense({units: 32, activation: 'elu'}))
         model.add(tf.layers.dense({
             units: this.actionSize,
             activation: 'softmax'
@@ -201,12 +201,12 @@ class Agent {
             await this.model.fit(state, target_f, {
                 epochs: 1,
                 verbose: 1,
-                callbacks: {
-                    onEpochEnd: (epoch, logs) => {
-                        // console.log('Logloss:', logs.loss)
-                        process.stdout.write(`${logs.loss} ${logs.acc}                             \r`)
-                    }
-                }
+                // callbacks: {
+                //     onEpochEnd: (epoch, logs) => {
+                //         // console.log('Logloss:', logs.loss)
+                //         process.stdout.write(`${logs.loss} ${logs.acc}                             \r`)
+                //     }
+                // }
             })
 
             await state.dispose()

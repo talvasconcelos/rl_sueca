@@ -4,7 +4,7 @@ const d = require('./deck')
 // const agent = new Agent(40)
 
 class Game{
-    constructor(agent){
+    constructor(agent, partner){
         this.defaults = {
             maxRounds: 8,
             maxPlayers: 4,
@@ -22,6 +22,7 @@ class Game{
         this.agent = agent
         this.trump = null
         this.firstRound = true
+        this.partner = partner
         this.tableCards = []
         this.playedCards = []
         this.totalPlayedCards = 0
@@ -171,7 +172,11 @@ class Game{
     async playCard(cards){
         // console.debug(this.players[this.turn].player)
         const isAI = this.players[this.turn].AI
-        const action = isAI ? await this.getAction(cards) : Math.floor(Math.random() * cards.length)
+        const partner = this.partner && this.players[this.turn].team === 'teamA' && !isAI
+        let action = isAI ? await this.getAction(cards) : Math.floor(Math.random() * cards.length)
+        if(partner) {
+            action = await this.getAction(cards, partner)
+        }
         // isAI && console.debug('playCard', action)
         const pickCard = cards[action]
         const idxCard = this.players[this.turn].hand.indexOf(pickCard)
@@ -182,7 +187,7 @@ class Game{
         return
     }
 
-    async getAction(cards){
+    async getAction(cards, isPartner){
         const data = {}
         data.trump = this.trump
         data.hand = cards
@@ -190,7 +195,9 @@ class Game{
         data.played = this.playedCards
         const state = await this.agent.getState(data)
         const action = await this.agent.takeAction(state, cards.length)
-        this.memory.push(state, action)
+        if(!isPartner){
+            this.memory.push(state, action)
+        }
         return action
     }
 
