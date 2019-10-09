@@ -4,7 +4,7 @@ const d = require('./deck')
 // const agent = new Agent(40)
 
 class Game{
-    constructor(agent, partner){
+    constructor(agent, partner = false){
         this.defaults = {
             maxRounds: 8,
             maxPlayers: 4,
@@ -181,7 +181,7 @@ class Game{
         const pickCard = cards[action]
         const idxCard = this.players[this.turn].hand.indexOf(pickCard)
         this.tableCards.push(pickCard)
-        this.playedCards.push(pickCard)
+        // this.playedCards.push(pickCard)
         this.players[this.turn].hand.splice(idxCard, 1)
         // console.debug(pickCard)
         return
@@ -198,11 +198,12 @@ class Game{
         if(!isPartner){
             this.memory.push(state, action)
         }
-        return action
+        return action[0]
     }
 
     async trickWinner(order){
         const cards = this.tableCards
+        this.playedCards.push(...this.tableCards)
         // console.debug('table cards', cards)
         const followSuit = cards[0].suit
         const points = cards.reduce((sum, c) => (sum += c.points), 0)

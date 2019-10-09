@@ -1,7 +1,7 @@
 const d = require('./deck')
 const tf = require('@tensorflow/tfjs')
 
-require('@tensorflow/tfjs-node')
+// require('@tensorflow/tfjs-node')
 
 class Agent {
     constructor(stateSize, modelName = 'DQN', gamma = 0.95, epsilon = 1.0, epsMin = 0.01, epsDecay = 0.95, lr = 0.001) {
@@ -31,9 +31,9 @@ class Agent {
     model() {
         const model = tf.sequential()
         model.add(tf.layers.dense({
-            units: 40,
+            units: 64,
             inputDim: this.stateSize,
-            activation: 'elu'
+            activation: 'relu'
         }))
         // model.add(tf.layers.dense({units: 32, activation: 'elu'}))
         model.add(tf.layers.dense({
@@ -110,20 +110,18 @@ class Agent {
             table,
             played
         } = data
-        const state = tf.buffer([4, 10])
+        const state = tf.buffer([4, 11])
         const trumpIdx = this.deck.suits.indexOf(trump)
+        state.set(1, trumpIdx, 10)
         // console.debug(isTrump)
         await hand.map(c => {
-            const t = c.idx[0] === trumpIdx ? 2 : 1
-            state.set(t, c.idx[0], c.idx[1])
+            state.set(1, c.idx[0], c.idx[1])
         })
         await played.map(c => {
-            const t = c.idx[0] === trumpIdx ? 6 : 5
-            state.set(t, c.idx[0], c.idx[1])
+            state.set(-1, c.idx[0], c.idx[1])
         })
         await table.map(c => {
-            const t = c.idx[0] === trumpIdx ? 4 : 3
-            state.set(t, c.idx[0], c.idx[1])
+            state.set(0.5, c.idx[0], c.idx[1])
         })
         // state.toTensor().print()
         return state.toTensor()
@@ -141,7 +139,7 @@ class Agent {
         // console.log('act', prediction.argMax(1).dataSync()[0])
         // console.debug('takeAction', pred, hand, random)
         const action = pred >= hand ? random : pred
-        return action
+        return [action, null, null]
     }
 
     async _takeAction(state, hand) {
@@ -201,12 +199,12 @@ class Agent {
             await this.model.fit(state, target_f, {
                 epochs: 1,
                 verbose: 1,
-                // callbacks: {
-                //     onEpochEnd: (epoch, logs) => {
-                //         // console.log('Logloss:', logs.loss)
-                //         process.stdout.write(`${logs.loss} ${logs.acc}                             \r`)
-                //     }
-                // }
+                callbacks: {
+                    onEpochEnd: (epoch, logs) => {
+                        // console.log('Logloss:', logs.loss)
+                        process.stdout.write(`${logs.loss} ${logs.acc}                  \r`)
+                    }
+                }
             })
 
             await state.dispose()
@@ -216,8 +214,8 @@ class Agent {
         if (this.epsilon > this.epsilonMin) {
             this.epsilon *= this.epsilonDecay
         }
-        // console.debug('Training... stop!')
-        return 'Training... stop!'
+        console.debug('Training... stop!')
+        return
     }
 }
 
