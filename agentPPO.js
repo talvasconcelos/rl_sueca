@@ -30,6 +30,22 @@ const proximalPolicyOptimization = (advantage, oldPrediction) => {
     return loss
 }
 
+const ppoLoss = (oldPolicyProbs, advantages, rewards, values) => {
+    const loss = (yTrue, yPred) => {
+        const newPolicyProbs = yPred
+        const ratio = tf.exp(tf.log(newPolicyProbs + 1e-10) - tf.log(oldPolicyProbs + 1e-10))
+        const p1 = ratio * advantages
+        const p2 = tf.clipByValue(ratio, 1 - LOSS_CLIPPING, 1 + LOSS_CLIPPING) * advantages
+        const actorLoss = -tf.mean(tf.minimum(p1, p2))
+        const criticLoss = tf.mean(tf.square(rewards - values))
+        /*total_loss = critic_discount * critic_loss + actor_loss - entropy_beta * K.mean(
+            -(newpolicy_probs * K.log(newpolicy_probs + 1e-10)))
+        return total_loss
+        */
+    }
+    return loss
+}
+
 class AgentPPO{
     constructor(){
         this.critic = this.buildCritic()

@@ -7,6 +7,7 @@ const train = async _ => {
         console.log('Game:', index + 1)
         const game = new Game(agent, index > 250)
         await game.startGame()
+        if(!(index % 10)) {agent.saveModel()}
     }
 }
 

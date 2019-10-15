@@ -65,7 +65,7 @@ class Game{
         console.log('Winner is', winner)
     }
 
-    getRoundWinner(){
+    async getRoundWinner(){
         const {teamA, teamB} = this.playScore
         if(teamA === teamB) {return}
         const winner = teamA > teamB ? 'teamA' : 'teamB'
@@ -77,9 +77,31 @@ class Game{
             roundScore = winPoints > 90 ? 2 : 1
         }        
         this.gameScore[winner] += roundScore
-        if(this.gameScore[winner] >= 4){
-            this.gameOver = true
-            console.log('Winner is', winner)
+        // console.log('Round winner is', winner, 'with', roundScore, 'points.')
+        // Last round state reward
+        const reward = this.players[0].team === winner
+            ? roundScore
+            : 0
+            const data = {}
+            data.trump = this.trump
+            data.hand = this.players[0].hand
+            data.table = this.tableCards
+            data.played = this.playedCards
+            const nextState = await this.agent.getState(data)
+            this.memory.push(reward, nextState, true)          
+        if(this.agent.memory.length > this.agent.maxMem - 1){
+            this.agent.memory.shift()
+        }        
+        this.agent.memory.push(this.memory)
+        this.tableCards = []
+        this.memory = []
+        if(this.agent.memory.length > this.agent.batchSize) {
+            // console.log(this.agent.memory.length, batch_size)
+            // console.log('train')
+            await this.agent.expReplay()//.then(console.debug('stopped training!')
+        }
+        if(roundScore >= 4){
+            this.getWinner
         }
     }
 
@@ -144,7 +166,7 @@ class Game{
         this.starter = this.nextPlayer(this.dealer)
         const hands = d.dealHand(deck, side)
         this.dealHands(hands, this.starter)
-        console.debug('Round Start!')
+        // console.debug('Round Start!')
         // return Array(this.defaults.maxPlays).fill(0).reduce( async (prev, cur) => {
         //     await prev
         //     return this.playHands()
@@ -165,6 +187,7 @@ class Game{
             return this.playCard(hand).catch(err => console.error(err))
         }, Promise.resolve())
         const winner = await this.trickWinner(order)
+        this.tableCards = []
         // console.debug('End Hand!', winner.player)
         return winner
     }
@@ -195,49 +218,46 @@ class Game{
         data.played = this.playedCards
         const state = await this.agent.getState(data)
         const action = await this.agent.takeAction(state, cards.length)
+        // console.debug(action)
         if(!isPartner){
             this.memory.push(state, action)
         }
-        return action[0]
+        return action
     }
 
     async trickWinner(order){
-        const cards = this.tableCards
+        const cards = this.tableCards.length > 4 ? this.tableCards.slice(-4) : this.tableCards
         this.playedCards.push(...this.tableCards)
         // console.debug('table cards', cards)
-        const followSuit = cards[0].suit
-        const points = cards.reduce((sum, c) => (sum += c.points), 0)
+        const followSuit = await cards[0].suit
+        const points = await cards.reduce((sum, c) => (sum += c.points), 0)
         cards.map((c, i) => c.suit !== followSuit && c.suit !== this.trump ? cards[i].ignore = true : c)
         const idxCard = this.indexOfMax(cards)
         const winner = order[idxCard]
         this.starter = this.players.indexOf(winner)
+        // console.debug(idxCard, winner, cards)
         this.playScore[winner.team] += points
         this.wonHands[winner.team]++
-        const reward = this.players[this.starter].team === winner.team 
-            ? this.playScore[winner.team] / 120
-            : 0
-        const data = {}
-        data.trump = this.trump
-        data.hand = this.players[0].hand
-        data.table = this.tableCards
-        data.played = this.playedCards
-        const nextState = await this.agent.getState(data)
-        const done = this.playedCards.length === 40
-        // console.debug(done)
-        this.memory.push(reward, nextState, done)
-        if(this.agent.memory.length > this.agent.maxMem - 1){
-            this.agent.memory.shift()
-        }
         
-        this.agent.memory.push(this.memory)
-        if(done && this.agent.memory.length > this.agent.batchSize) {
-            // console.log(this.agent.memory.length, batch_size)
-            console.log('train')
-            await this.agent.expReplay()//.then(console.debug('stopped training!')
+        const done = this.playedCards.length === 40
+        if(!done){
+            const reward = this.players[this.starter].team === winner.team 
+            ? 0.1
+            : 0
+            const data = {}
+            data.trump = this.trump
+            data.hand = this.players[0].hand
+            data.table = this.tableCards
+            data.played = this.playedCards
+            const nextState = await this.agent.getState(data)
+            this.memory.push(reward, nextState, done)            
+            // this.tableCards = []
         }
-        this.tableCards = []
-        this.memory = []
         return winner
+        // console.debug(done)
+        
+        // this.memory = []
+        // return winner
     }
 }
 

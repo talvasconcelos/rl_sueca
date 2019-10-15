@@ -10,8 +10,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@tensorflow/tfjs": "^1.2.9",
-    "@tensorflow/tfjs-node": "^1.2.10",
+    "@tensorflow/tfjs": "^1.2.11",
+    "@tensorflow/tfjs-node": "^1.2.11",
     "install": "^0.13.0",
     "npm": "^6.11.3"
   }

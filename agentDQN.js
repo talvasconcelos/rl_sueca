@@ -1,7 +1,7 @@
 const d = require('./deck')
 const tf = require('@tensorflow/tfjs')
 
-// require('@tensorflow/tfjs-node')
+require('@tensorflow/tfjs-node')
 
 class Agent {
     constructor(stateSize, modelName = 'DQN', gamma = 0.95, epsilon = 1.0, epsMin = 0.01, epsDecay = 0.95, lr = 0.001) {
@@ -139,7 +139,7 @@ class Agent {
         // console.log('act', prediction.argMax(1).dataSync()[0])
         // console.debug('takeAction', pred, hand, random)
         const action = pred >= hand ? random : pred
-        return [action, null, null]
+        return action
     }
 
     async _takeAction(state, hand) {
@@ -170,10 +170,16 @@ class Agent {
 
     }
 
+    async saveModel(){
+        await this.model.save('file://./model-1a')
+        return
+    }
+
     async expReplay() {
         console.debug('Training...')
         const minibatch = [...this.memory].sort(() => .5 - Math.random()).slice(0, this.batchSize)
         // console.debug(minibatch)
+        let loss
         for (let i = 0; i < minibatch.length - 1; i++) {
             let [state, action, reward, next_state, done] = minibatch[i]
             // console.debug(state, next_state)
@@ -196,16 +202,18 @@ class Agent {
             // console.log(target_f.shape)
             // target_f.print()
             target_f = tf.tensor2d(target_f, [1, this.actionSize])//.reshape([1,3])
-            await this.model.fit(state, target_f, {
+            const h = await this.model.fit(state, target_f, {
                 epochs: 1,
                 verbose: 1,
-                callbacks: {
-                    onEpochEnd: (epoch, logs) => {
-                        // console.log('Logloss:', logs.loss)
-                        process.stdout.write(`${logs.loss} ${logs.acc}                  \r`)
-                    }
-                }
+                // callbacks: {
+                //     onEpochEnd: (epoch, logs) => {
+                //         // console.log('Logloss:', logs.loss)
+                //         process.stdout.write(`${logs.loss} ${logs.acc}\n`)
+                //     }
+                // }
             })
+
+            process.stdout.write(`${h.history.loss[0]}\r`)
 
             await state.dispose()
             await next_state.dispose()
